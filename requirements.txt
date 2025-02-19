@@ -1,5 +1,5 @@
 ﻿streamlit
-opencv-python
-numpy
+opencv-python-headless
 scikit-image
-gunicorn
+numpy
+matplotlib
