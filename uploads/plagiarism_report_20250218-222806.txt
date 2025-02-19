@@ -1,0 +1,10 @@
+Image Plagiarism Analysis Report
+Generated on: 2025-02-18 22:28:06
+
+Image 1: MS-Dhoni.png
+Image 2: MS-Dohni.png
+
+SSIM Similarity Score: 0.1474
+ORB Feature Similarity: 0.3000
+Combined Similarity Score: 0.2085
+

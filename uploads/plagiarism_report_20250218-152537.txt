@@ -1,0 +1,10 @@
+Image Plagiarism Analysis Report
+Generated on: 2025-02-18 15:25:37
+
+Image 1: logo.jpg
+Image 2: mylogo.png
+
+SSIM Similarity Score: 0.9645
+ORB Feature Similarity: 0.4020
+Combined Similarity Score: 0.7395
+

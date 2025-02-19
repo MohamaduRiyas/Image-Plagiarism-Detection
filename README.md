@@ -1,0 +1,1 @@
+﻿# Image Plagiarism Detection Project
