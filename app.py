@@ -11,7 +11,114 @@ from PIL import Image
 import io
 import base64
 import hashlib
+import math
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+import uuid
+import hmac
+import urllib.parse
 
+
+def find_image_source(img_path):
+    """
+    Performs a reverse image search using TinEye's API to find original image sources.
+    """
+    try:
+        # TinEye API configuration
+        TINEYE_API_URL = "https://api.tineye.com/rest/search/"
+        TINEYE_PUBLIC_KEY = "YOUR_TINEYE_PUBLIC_KEY"
+        TINEYE_PRIVATE_KEY = "YOUR_TINEYE_PRIVATE_KEY"
+        
+        # Read the image file
+        with open(img_path, 'rb') as image_file:
+            files = {'image': ('image.jpg', image_file, 'image/jpeg')}
+            
+            # Set up authentication and request headers
+            timestamp = int(time.time())
+            nonce = uuid.uuid4().hex
+            
+            # Generate sorted query string
+            query_params = {
+                'api_key': TINEYE_PUBLIC_KEY,
+                'nonce': nonce,
+                'timestamp': timestamp
+            }
+            
+            # Sort parameters alphabetically
+            sorted_params = sorted(query_params.items())
+            query_string = urllib.parse.urlencode(sorted_params)
+            
+            # Generate signature
+            signature_string = f"{TINEYE_PRIVATE_KEY}{query_string}"
+            signature = hmac.new(
+                TINEYE_PRIVATE_KEY.encode('utf-8'),
+                signature_string.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+            
+            # Add signature to parameters
+            query_params['signature'] = signature
+            
+            # Make the API request
+            response = requests.post(
+                TINEYE_API_URL,
+                files=files,
+                params=query_params,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                results = response.json()
+                formatted_sources = []
+                
+                # Process TinEye matches
+                for match in results.get('matches', []):
+                    # Get additional metadata for each match
+                    domain_metadata = match.get('domain_metadata', {})
+                    
+                    source = {
+                        "url": match.get('backlink', ''),
+                        "title": domain_metadata.get('title', 'Image Match Found'),
+                        "source": domain_metadata.get('domain', match.get('domain', '')),
+                        "license": get_image_license(match),
+                        "contact": domain_metadata.get('contact', 'Contact via website'),
+                        "thumbnail": match.get('thumbnail_url', ''),
+                        "match_percent": match.get('score', 0),
+                        "first_seen": match.get('first_crawled_at', ''),
+                        "last_seen": match.get('last_crawled_at', ''),
+                        "image_size": f"{match.get('width', 0)}x{match.get('height', 0)}"
+                    }
+                    formatted_sources.append(source)
+                
+                # Sort results by match percentage
+                formatted_sources.sort(key=lambda x: x['match_percent'], reverse=True)
+                
+                if formatted_sources:
+                    return formatted_sources
+                else:
+                    st.info("No matching sources found in TinEye's database.")
+                    return []
+            
+            else:
+                st.error(f"TinEye API Error: {response.status_code}")
+                return []
+                
+    except Exception as e:
+        st.error(f"Error during image search: {str(e)}")
+        return []
+
+def get_image_license(match):
+    """
+    Determine image license information from TinEye match data
+    """
+    license_info = match.get('license', {})
+    if license_info:
+        return {
+            'type': license_info.get('type', 'Unknown'),
+            'attribution': license_info.get('attribution', ''),
+            'terms': license_info.get('terms', 'See source website for license details')
+        }
+    return 'License information unavailable'
 # Set page config with improved styling
 st.set_page_config(
     page_title="Image Plagiarism Detector",
@@ -370,7 +477,7 @@ with st.sidebar:
     """)
 
 # Main content
-st.markdown("<h1 class='main-header'>🖼️ Advanced Image Plagiarism Detection</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-header'>Image Plagiarism Detection</h1>", unsafe_allow_html=True)
 st.markdown("Detect potential image plagiarism using computer vision and deep analysis techniques.")
 
 # Upload section with improved UI
@@ -488,34 +595,34 @@ if uploaded_file1 and uploaded_file2:
         # Individual metrics
         with col1:
             st.markdown(f"""
-            <div class='card'>
-                <h4>SSIM Score</h4>
-                <div class='metric-value'>{ssim_score:.0%}</div>
-                <div class='metric-label'>Structural Similarity</div>
-                <p style='font-size: 0.8rem; margin-top: 0.5rem;'>Measures how similar the images are in terms of luminance, contrast, and structure.</p>
-            </div>
+            <div class='card' style='background: #1a1a1a; padding: 15px; border-radius: 10px; text-align: center;'>
+        <h4 style='color: #ddd; margin-bottom: 8px;'>SSIM Score</h4>
+        <div class='metric-value' style='font-size: 1.8rem; font-weight: bold; color: #00ff99;'>{ssim_score:.0%}</div>
+        <div class='metric-label' style='color: #bbb;'>Structural Similarity</div>
+        <p style='font-size: 0.8rem; margin-top: 0.5rem; color: #888;'>Measures how similar the images are in terms of luminance, contrast, and structure.</p>
+    </div>
             """, unsafe_allow_html=True)
         
         with col2:
             st.markdown(f"""
-            <div class='card'>
-                <h4>ORB Score</h4>
-                <div class='metric-value'>{orb_score:.0%}</div>
-                <div class='metric-label'>Feature Matching</div>
-                <p style='font-size: 0.8rem; margin-top: 0.5rem;'>Measures similarity based on key feature points detected in both images.</p>
-            </div>
+           <div class='card' style='background: #1a1a1a; padding: 15px; border-radius: 10px; text-align: center;'>
+        <h4 style='color: #ddd; margin-bottom: 8px;'>ORB Score</h4>
+        <div class='metric-value' style='font-size: 1.8rem; font-weight: bold; color: #f1c40f;'>{orb_score:.0%}</div>
+        <div class='metric-label' style='color: #bbb;'>Feature Matching</div>
+        <p style='font-size: 0.8rem; margin-top: 0.5rem; color: #888;'>Measures similarity based on key feature points detected in both images.</p>
+    </div>
             """, unsafe_allow_html=True)
         
         with col3:
             # Calculate percentage of modified pixels
             modified_pixel_percent = np.sum(ssim_diff < 0.9) / (ssim_diff.shape[0] * ssim_diff.shape[1]) * 100
             st.markdown(f"""
-            <div class='card'>
-                <h4>Modified Areas</h4>
-                <div class='metric-value'>{modified_pixel_percent:.1f}%</div>
-                <div class='metric-label'>Content Differences</div>
-                <p style='font-size: 0.8rem; margin-top: 0.5rem;'>Percentage of image area that shows significant differences.</p>
-            </div>
+            <div class='card' style='background: #1a1a1a; padding: 15px; border-radius: 10px; text-align: center;'>
+        <h4 style='color: #ddd; margin-bottom: 8px;'>Modified Areas</h4>
+        <div class='metric-value' style='font-size: 1.8rem; font-weight: bold; color: #ff6666;'>{modified_pixel_percent:.1f}%</div>
+        <div class='metric-label' style='color: #bbb;'>Content Differences</div>
+        <p style='font-size: 0.8rem; margin-top: 0.5rem; color: #888;'>Percentage of image area that shows significant differences.</p>
+    </div>
             """, unsafe_allow_html=True)
         
         # Detailed visualization
@@ -681,7 +788,55 @@ if uploaded_file1 and uploaded_file2:
                 # No need to save, as images are already saved during processing
                 st.success(f"Visualization images saved to uploads directory")
 
-# Footer
-st.markdown("<div class='footer'>", unsafe_allow_html=True)
-st.markdown("👨‍💻 Developed by **MOHAMADU RIYAS** | 🚀 Deployed with Streamlit| Contact @https://www.linkedin.com/in/mohamadu-riyas/" )
-st.markdown("</div>", unsafe_allow_html=True)
+def create_footer():
+    footer_html = """
+    <style>
+        .footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            padding: 10px 0;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .footer-content a {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        .footer-content a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+        .footer-divider {
+            color: #dee2e6;
+        }
+    </style>
+    <div class='footer'>
+        <div class='footer-content'>
+            <span>👨‍💻 Developed by <strong>MOHAMADU RIYAS</strong></span>
+            <span class='footer-divider'>|</span>
+            <span>🚀 Deployed with Streamlit</span>
+            <span class='footer-divider'>|</span>
+            <span>
+                <a href="https://www.linkedin.com/in/mohamadu-riyas/" target="_blank">
+                    Connect on LinkedIn
+                </a>
+            </span>
+        </div>
+    </div>
+    """
+    st.markdown(footer_html, unsafe_allow_html=True)
+
+# Usage
+create_footer()

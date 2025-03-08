@@ -1,0 +1,10 @@
+Image Plagiarism Analysis Report
+Generated on: 2025-02-21 10:15:12
+
+Image 1: 1.jpg
+Image 2: 1.jpg
+
+SSIM Similarity Score: 1.0000
+ORB Feature Similarity: 1.0000
+Combined Similarity Score: 1.0000
+
